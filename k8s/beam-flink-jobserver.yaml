@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: flink-beam-jobserver
+spec:
+ selector:
+   matchLabels:
+     app: flink-beam-jobserver
+ template:
+   metadata:
+     labels:
+       app: flink-beam-jobserver
+   spec:
+     containers:
+     - name: flink-beam-jobserver
+       image: apache/beam_flink1.10_job_server:2.23.0
+       ports:
+       - containerPort: 8099
+         name: jobservice
+       - containerPort: 8098
+         name: artifact
+       - containerPort: 8097
+         name: expansion
+       volumeMounts:
+         - name: beam-artifact-staging
+           mountPath: "/tmp/beam-artifact-staging"
+       command: [
+           "/bin/bash", "-c", "./flink-job-server.sh --job-port=8099 --flink-master-url=flink-jobmanager"
+       ]
+     volumes:
+     - name: beam-artifact-staging
+       hostPath:
+         path: /tmp/beam-artifact-staging
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: flink-beam-jobserver
+ labels:
+   app: flink-beam-jobserver
+spec:
+ selector:
+   app: flink-beam-jobserver
+ type: NodePort
+ ports:
+ - name: job-service
+   port: 8099
+   targetPort: 8099
+ - name: artifacts
+   port: 8098
+   targetPort: 8098
+ - name: expansion
+   port: 8097
+   targetPort: 8097

@@ -1,0 +1,214 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-config
+  labels:
+    app: flink
+data:
+  flink-conf.yaml: |+
+    jobmanager.rpc.address: flink-jobmanager
+    taskmanager.numberOfTaskSlots: 4
+    blob.server.port: 6124
+    jobmanager.rpc.port: 6123
+    taskmanager.rpc.port: 6122
+    jobmanager.heap.size: 4096m
+    taskmanager.heap.size: 8192m
+  log4j.properties: |+
+    log4j.rootLogger=INFO, file, console
+    log4j.logger.akka=INFO
+    log4j.logger.org.apache.kafka=INFO
+    log4j.logger.org.apache.hadoop=INFO
+    log4j.logger.org.apache.zookeeper=INFO
+    log4j.appender.file=org.apache.log4j.FileAppender
+    log4j.appender.file.file=${log.file}
+    log4j.appender.file.layout=org.apache.log4j.PatternLayout
+    log4j.appender.file.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %-60c %x - %m%n
+    log4j.logger.org.apache.flink.shaded.akka.org.jboss.netty.channel.DefaultChannelPipeline=ERROR, file
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: jobmanager
+    spec:
+      containers:
+      - name: jobmanager
+        image: docker-flink:1.10
+        workingDir: /opt/flink
+        command: ["/bin/bash", "-c", "$FLINK_HOME/bin/jobmanager.sh start;\
+          while :;
+          do
+            if [[ -f $(find log -name '*jobmanager*.log' -print -quit) ]];
+              then tail -f -n +1 log/*jobmanager*.log;
+            fi;
+          done"]
+        env:
+        - name: JOB_MANAGER_RPC_ADDRESS
+          value: "0.0.0.0"
+        ports:
+        - containerPort: 6123
+          name: rpc
+        - containerPort: 6124
+          name: blob
+        - containerPort: 8081
+          name: ui
+        livenessProbe:
+          httpGet:
+            path: /overview
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+          - name: flink-config-volume
+            mountPath: /opt/flink/conf
+      volumes:
+      - name: flink-config-volume
+        configMap:
+          name: flink-config
+          items:
+          - key: flink-conf.yaml
+            path: flink-conf.yaml
+          - key: log4j.properties
+            path: log4j.properties
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager-rest
+  labels:
+    app: flink
+    component: jobmanager
+spec:
+  type: NodePort
+  ports:
+  - name: rest
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  selector:
+    app: flink
+    component: jobmanager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager
+  labels:
+    app: flink
+    component: jobmanager
+spec:
+  type: ClusterIP
+  ports:
+  - name: rpc
+    port: 6123
+    targetPort: 6123
+  - name: blob
+    port: 6124
+    targetPort: 6124
+  - name: ui
+    port: 8081
+    targetPort: 8081
+  selector:
+    app: flink
+    component: jobmanager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-taskmanager
+  labels:
+    app: flink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: taskmanager
+    spec:
+      containers:
+      - name: docker
+        image: docker:19.03.5-dind
+        # args: ["--insecure-registry=dockereg:5000", "--registry-mirror=http://dockermirror:5000"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: dind-storage
+            mountPath: /var/lib/docker
+        env:
+          # - name: DOCKER_REGISTRY_MIRROR
+          #   value: http://dockermirror:5000
+          # - name: DOCKER_INSECURE_REGISTRY
+          #   value: dockereg:5000
+          - name: DOCKER_TLS_CERTDIR
+            value: ""
+      - name: taskmanager
+        image: docker-flink:1.10
+        workingDir: /opt/flink
+        command: ["/bin/bash", "-c", "$FLINK_HOME/bin/taskmanager.sh start; \
+          while :;
+          do
+            if [[ -f $(find log -name '*taskmanager*.log' -print -quit) ]];
+              then tail -f -n +1 log/*taskmanager*.log;
+            fi;
+          done"]
+        env:
+        - name: DOCKER_HOST
+          value: tcp://localhost:2375
+        ports:
+        - containerPort: 6122
+          name: rpc
+        # livenessProbe:
+        #   tcpSocket:
+        #     port: 6122
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 60
+        volumeMounts:
+          - name: flink-config-volume
+            mountPath: /opt/flink/conf/
+          # - name: beam-artifact-staging
+          #   mountPath: "/tmp/beam-artifact-staging"
+      volumes:
+      - name: dind-storage
+        emptyDir:
+          # medium: Memory
+      # - name: beam-artifact-staging
+      #   hostPath:
+      #     path: /tmp/k8s_artifact_staging
+      - name: flink-config-volume
+        configMap:
+          name: flink-config
+          items:
+          - key: flink-conf.yaml
+            path: flink-conf.yaml
+          - key: log4j.properties
+            path: log4j.properties
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-taskmanager
+  labels:
+    app: flink
+    component: taskmanager
+spec:
+  type: ClusterIP
+  ports:
+  - name: rpc
+    port: 6122
+    targetPort: 6122
+  selector:
+    app: flink
+    component: taskmanager
