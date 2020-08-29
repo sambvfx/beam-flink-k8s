@@ -70,6 +70,13 @@ spec:
         volumeMounts:
           - name: flink-config-volume
             mountPath: /opt/flink/conf
+        resources:
+          limits:
+            cpu: 1.0
+            memory: 4Gi
+          requests:
+            cpu: 0.5
+            memory: 2Gi
       volumes:
       - name: flink-config-volume
         configMap:
@@ -88,7 +95,7 @@ metadata:
     app: flink
     component: jobmanager
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
   - name: rest
     port: 8081
@@ -154,6 +161,13 @@ spec:
           #   value: dockereg:5000
           - name: DOCKER_TLS_CERTDIR
             value: ""
+        resources:
+          limits:
+            cpu: 1.0
+            memory: 1Gi
+          requests:
+            cpu: 0.5
+            memory: 100Mi
       - name: taskmanager
         image: docker-flink:1.10
         workingDir: /opt/flink
@@ -180,6 +194,13 @@ spec:
             mountPath: /opt/flink/conf/
           # - name: beam-artifact-staging
           #   mountPath: "/tmp/beam-artifact-staging"
+        resources:
+          limits:
+            cpu: 1.0
+            memory: 3Gi
+          requests:
+            cpu: 0.5
+            memory: 1Gi
       volumes:
       - name: dind-storage
         emptyDir:
