@@ -26,8 +26,9 @@ spec:
          - name: beam-artifact-staging
            mountPath: "/tmp/beam-artifact-staging"
        command: [
-           "/bin/bash", "-c", "./flink-job-server.sh --job-port=8099 --flink-master-url=flink-jobmanager"
+           "/bin/bash", "-c", "./flink-job-server.sh --job-port=8099 --job-host=flink-beam-jobserver --flink-master-url=flink-jobmanager"
        ]
+     dnsPolicy: ClusterFirst
      volumes:
      - name: beam-artifact-staging
        hostPath:
@@ -42,7 +43,7 @@ metadata:
 spec:
  selector:
    app: flink-beam-jobserver
- type: NodePort
+ type: LoadBalancer
  ports:
  - name: job-service
    port: 8099

@@ -34,7 +34,7 @@ kubectl get pods
 PYTHON_VERSION=$(python --version | cut -d" " -f2 | cut -d"." -f1-2)
 BEAM_VERSION=$(python -c "import apache_beam;print(apache_beam.__version__)")
 TASKMANAGER_POD=$(kubectl get pods --selector=component=taskmanager --no-headers -o name)
-kubectl exec ${TASKMANAGER_POD} -- docker pull apache/beam_python${PYTHON_VERSION}_sdk:${BEAM_VERSION}
+kubectl exec ${TASKMANAGER_POD} -c taskmanager -- docker pull apache/beam_python${PYTHON_VERSION}_sdk:${BEAM_VERSION}
 ```
 
 Submit a beam pipeline.

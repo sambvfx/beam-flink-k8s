@@ -1,4 +1,5 @@
 import argparse
+import logging
 from typing import Tuple, Optional, TypeVar
 
 import apache_beam as beam
@@ -32,6 +33,7 @@ def main(options=None):
 
 
 if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.DEBUG)
     parser = argparse.ArgumentParser()
     _, args = parser.parse_known_args()
     options = PipelineOptions(args)
