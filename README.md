@@ -10,7 +10,7 @@ This assumes you're starting in an environment with python, a recent version of 
 
 Start up a simple minikube k8s cluster
 ```shell script
-minikube start --cpus 4 --memory='6gb' --disk-size='20gb'
+minikube start --cpus 4 --memory=6144 --disk-size='20gb'
 ```
 
 Build a slightly modified flink image that has docker installed. Building this directly in the minikube registry simplifies things.
@@ -59,8 +59,17 @@ kubectl logs -f ${TASKMANAGER_POD} -c taskmanager
 
 Beam Flink Job Server
 ---
-\# TODO
 
-Using the `PortableRunner` you can submit to a beam-flink-jobserver running in k8s. When whipping this example up I didn't test that this was working but left in some pieces for those interested.
+> WIP: This is not currently working as-is!
 
-A big challenge is that the taskmanager needs to share the artifact staging volume with the artifact service which runs as part of the jobservice. This is the same reason we need to provide `--flink_submit_uber_jar` using the `FlinkRunner` when providing any artifacts (e.g. `--save_main_session`). I'm not sure if newer versions of beam provide alternative ways to pass the artifacts, but that is an improvement that could be made.
+It's also possible to use the `PortableRunner` you can submit to a beam-flink-jobserver running in k8s.
+
+As of writing this, there seems to be a regression where the `--artifact_endpoint` is not working as intended (https://github.com/apache/beam/pull/12905). You'll need this small fix to submit to jobserver running in k8s.
+
+```shell script
+JOB_ENDPOINT=$(minikube service flink-beam-jobserver --url | sed '1q;d')
+ARTIFACT_ENDPOINT=$(minikube service flink-beam-jobserver --url | sed '2q;d')
+PYTHON_VERSION=$(python --version | cut -d" " -f2 | cut -d"." -f1-2)
+BEAM_VERSION=$(python -c "import apache_beam;print(apache_beam.__version__)")
+python -m pipeline --runner PortableRunner --job_endpoint ${JOB_ENDPOINT} --artifact_endpoint ${ARTIFACT_ENDPOINT} --save_main_session --environment_type DOCKER --environment_config apache/beam_python${PYTHON_VERSION}_sdk:${BEAM_VERSION}
+```
