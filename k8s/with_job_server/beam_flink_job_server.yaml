@@ -26,13 +26,13 @@ spec:
          - name: beam-artifact-staging
            mountPath: "/tmp/beam-artifact-staging"
        command: [
-           "/bin/bash", "-c", "./flink-job-server.sh --job-port=8099 --job-host=flink-beam-jobserver --flink-master-url=flink-jobmanager"
+           "/bin/bash", "-c", "./flink-job-server.sh --job-port=8099 --flink-master-url=flink-jobmanager"
        ]
      dnsPolicy: ClusterFirst
      volumes:
      - name: beam-artifact-staging
-       hostPath:
-         path: /tmp/beam-artifact-staging
+       persistentVolumeClaim:
+         claimName: nfs-flink-pvc
 ---
 apiVersion: v1
 kind: Service

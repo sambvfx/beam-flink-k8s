@@ -1,0 +1,97 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-flink-data
+  labels:
+    app: nfs-flink-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-flink-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: nfs-flink-server
+  template:
+    metadata:
+      labels:
+        role: nfs-flink-server
+    spec:
+      containers:
+      - name: nfs-flink-server
+        image: k8s.gcr.io/volume-nfs:0.8
+        ports:
+          - name: nfs
+            containerPort: 2049
+          - name: mountd
+            containerPort: 20048
+          - name: rpcbind
+            containerPort: 111
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - mountPath: /exports
+            name: mypvc
+      volumes:
+        - name: mypvc
+          persistentVolumeClaim:
+            claimName: nfs-flink-data
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: nfs-flink-server
+spec:
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+  selector:
+    role: nfs-flink-server
+#---
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: nfs-persistence-storageclass
+#parameters:
+#  type: pd-ssd
+#provisioner: kubernetes.io/gce-pd
+#volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-flink-pv
+spec:
+  storageClassName: nfs-persistence-storageclass
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: nfs-flink-server.default.svc.cluster.local
+    path: "/flink/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-flink-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+#  storageClassName: "nfs-persistence-storageclass"
+  resources:
+    requests:
+      storage: 5Gi
